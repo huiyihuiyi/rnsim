@@ -26,6 +26,12 @@ int nodes_total = 0;
 std::vector<double> antennas_pos_;
 std::vector<std::vector<double>> antennas_pos;
 
+// Slot map
+std::vector<double> slot_map_;
+std::vector<std::vector<double>> slot_map;
+std::vector<double> slot_map_time;
+
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "rnsim");
@@ -46,6 +52,7 @@ int main(int argc, char **argv)
         printf( "No node ID declared. Exiting...\n" );
         exit(-1);
     }
+    cout << endl;
 
 
     //Get params of the anchor
@@ -72,6 +79,8 @@ int main(int argc, char **argv)
         printf( "No node position declared. Exit...\n");
         exit(-2);
     }
+    cout << endl;
+
 
     //Get params of the antennas
     if(rnsim_nh.getParam("/rnsim/antennas_pos", antennas_pos_))
@@ -143,6 +152,54 @@ int main(int argc, char **argv)
                         antennas_pos[i][j*3],
                         antennas_pos[i][j*3+1],
                         antennas_pos[i][j*3+2]);
+        }
+    }
+    cout << endl;
+
+    //Get params of the antennas
+    if(rnsim_nh.getParam("/rnsim/slot_map", slot_map_))
+    {
+        int i = 0;
+        while(true)
+        {
+            int slot_id = int(slot_map_[i]);
+
+            if(slot_map.size() < slot_id + 1)
+            {
+                slot_map.push_back(std::vector<double>{});
+                slot_map_time.push_back(slot_map_[i+5]);
+            }
+
+            slot_map[slot_id].push_back(slot_map_[i+1]);
+            slot_map[slot_id].push_back(slot_map_[i+2]);
+            slot_map[slot_id].push_back(slot_map_[i+3]);
+            slot_map[slot_id].push_back(slot_map_[i+4]);
+
+            i = i + 6;
+
+            if(i >= slot_map_.size())
+                break;
+        }
+    }
+    else
+    {
+        printf("No slot map declared. Exitting.\n");
+        exit(-1);
+    }
+
+    for(int i = 0; i < slot_map.size(); i++)
+    {
+        int transactions = slot_map[i].size()/4;
+        printf("Slot %d has %d transaction(s):\n", i, transactions);
+        // for(int j = 0; j < slot_map[i].size(); j++)
+        //     printf("%.0f ", slot_map[i][j]);
+        // printf("\n");
+        for(int j = 0; j < transactions; j++)
+        {
+            printf("Time: %.3f, Range %.0f.%.0f -> %.0f.%.0f\n",
+                    slot_map_time[i],
+                    slot_map[i][j*4], slot_map[i][j*4 + 2],
+                    slot_map[i][j*4 + 1], slot_map[i][j*4 + 3]);
         }
     }
 
