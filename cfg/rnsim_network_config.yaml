@@ -23,7 +23,7 @@ rnsim:
     antennas_pos:
         [200, 2, 0.0, 0.25, 0.0, 0.0, -0.25, 0.0,
          201, 2, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0]
-    # slot map, each row starts with the slot ID, followed by requestor ID,
+    # Slot map, each row starts with the slot ID, followed by requestor ID,
     # responder ID, requester antenna ID, responder antenna ID, and time period.
     # If two transactions occur at the same time, the time period of the firstly
     # declared transaction is the time period of the slot.
@@ -37,5 +37,7 @@ rnsim:
          5, 200, 102, 1, 0, 0.025,
          6, 200, 103, 0, 0, 0.025,
          7, 200, 103, 1, 0, 0.025]
-
-
+    # Name of topics for ground truth, each row specify the ID of the node
+    # follow
+    ground_truth_topic:
+        ["200", "/vicon/firefly_sbx/firefly_sbx"]
