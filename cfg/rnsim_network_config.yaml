@@ -27,9 +27,9 @@ rnsim:
     # responder ID, requester antenna ID, responder antenna ID, and time period.
     # If two transactions occur at the same time, the time period of the firstly
     # declared transaction is the time period of the slot.
-    slot_map:
+    slotmap:
         [0, 200, 100, 0, 0, 0.025,
-         1, 101, 102, 0, 0, 0.025,
+         1, 101, 102, 0, 0, 0.050,
          1, 200, 100, 1, 0, 0.025,
          2, 200, 101, 0, 0, 0.025,
          3, 200, 101, 1, 0, 0.025,

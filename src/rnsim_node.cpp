@@ -26,8 +26,9 @@ int nodes_total = 0;
 std::vector<std::vector<double>> antennas_pos;
 
 // Slot map
-std::vector<std::vector<double>> slot_map;
-std::vector<double> slot_map_time;
+std::vector<std::vector<int>> slotmap;
+std::vector<std::vector<int>> slotmap_by_idx;
+std::vector<double> slotmap_time;
 
 // Ground truth topic
 std::vector<std::string> ground_truth_topic;
@@ -36,6 +37,8 @@ std::vector<geometry_msgs::TransformStamped> nodes_info_msg;
 
 std::vector<ros::Publisher> ground_truth_pub;
 std::vector<geometry_msgs::PoseStamped> ground_truth_viz_msg;
+
+ros::Timer rn_timer;
 
 void ground_truth_cb(const geometry_msgs::TransformStamped::ConstPtr& msg, int i)
 {
@@ -58,12 +61,44 @@ void ground_truth_cb(const geometry_msgs::TransformStamped::ConstPtr& msg, int i
     return;
 }
 
+void timer_cb(const ros::TimerEvent&)
+{
+    static int slot_idx = 0;
+    static ros::Time prev_time = ros::Time::now();
+
+    printf("Slot: %d. True time: %.3f. Intended time: %.3f\n",
+            slot_idx, (ros::Time::now() - prev_time).toSec(),
+            slotmap_time[slot_idx]);
+    prev_time = ros::Time::now();
+    
+    int transactions = slotmap[slot_idx].size()/4;
+    if (transactions != 0)
+    {
+        //Calculate the distance and publish
+        for(int j = 0; j < transactions; j++)
+        {
+            printf("Range %d.%d -> %d.%d\n",
+                    slotmap[slot_idx][j*4], slotmap[slot_idx][j*4 + 2],
+                    slotmap[slot_idx][j*4 + 1], slotmap[slot_idx][j*4 + 3]);        
+        }
+    }
+
+    // Increment the slot ID
+    slot_idx++;
+    if (slot_idx == slotmap_time.size())
+        slot_idx = 0;
+
+    rn_timer.setPeriod(ros::Duration(slotmap_time[slot_idx]));
+
+    return;
+}
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "rnsim");
     ros::NodeHandle rnsim_nh("~");
 
-//Get all the node IDs
+//Get all the node IDs-------------------------------------------------------------------------------
     if(rnsim_nh.getParam("/rnsim/nodes_id", nodes_id))
     {
         nodes_total = nodes_id.size();
@@ -79,10 +114,10 @@ int main(int argc, char **argv)
         exit(-1);
     }
     cout << endl;
-//Get all the node IDs
+//Get all the node IDs-------------------------------------------------------------------------------
 
 
-//Get params of the node positions, and create vectors to hold corresponding object
+//Get params of the node positions, and create vectors to hold corresponding object------------------
     if(rnsim_nh.getParam("/rnsim/nodes_pos", nodes_pos))
     {
         if (nodes_total == nodes_pos.size()/3)
@@ -113,10 +148,10 @@ int main(int argc, char **argv)
         exit(-2);
     }
     cout << endl;
-//Get params of the node positions, and create vectors to hold corresponding object
+//Get params of the node positions, and create vectors to hold corresponding object------------------
 
 
-//Get the antenna configurations
+//Get the antenna configurations---------------------------------------------------------------------
     std::vector<double> antennas_pos_;
     if(rnsim_nh.getParam("/rnsim/antennas_pos", antennas_pos_))
     {
@@ -190,33 +225,33 @@ int main(int argc, char **argv)
         }
     }
     cout << endl;
-//Get the antenna configurations
+//Get the antenna configurations---------------------------------------------------------------------
 
 
-//Get the slot map configuration
-    std::vector<double> slot_map_;
-    if(rnsim_nh.getParam("/rnsim/slot_map", slot_map_))
+//Get the slot map configuration---------------------------------------------------------------------
+    std::vector<double> slotmap_;
+    if(rnsim_nh.getParam("/rnsim/slotmap", slotmap_))
     {
         int i = 0;
         while(true)
         {
-            int slot_id = int(slot_map_[i]);
+            int slot_idx = int(slotmap_[i]);
 
-            if(slot_map.size() < slot_id + 1)
+            if(slotmap.size() < slot_idx + 1)
             {
-                slot_map.push_back(std::vector<double>{});
-                slot_map_time.push_back(slot_map_[i+5]);
+                slotmap.push_back(std::vector<int>{});
+                slotmap_time.push_back(slotmap_[i+5]);
             }
 
-            slot_map[slot_id].push_back(slot_map_[i+1]);
-            slot_map[slot_id].push_back(slot_map_[i+2]);
-            slot_map[slot_id].push_back(slot_map_[i+3]);
-            slot_map[slot_id].push_back(slot_map_[i+4]);
+            slotmap[slot_idx].push_back(int(slotmap_[i+1]));
+            slotmap[slot_idx].push_back(int(slotmap_[i+2]));
+            slotmap[slot_idx].push_back(int(slotmap_[i+3]));
+            slotmap[slot_idx].push_back(int(slotmap_[i+4]));
 
             i = i + 6;
 
             // Skip if there are fewer than 6 values in the array
-            if(slot_map_.size() - i < 6)
+            if(slotmap_.size() - i < 6)
                 break;
         }
     }
@@ -226,26 +261,26 @@ int main(int argc, char **argv)
         exit(-3);
     }
 
-    for(int i = 0; i < slot_map.size(); i++)
+    for(int i = 0; i < slotmap.size(); i++)
     {
-        int transactions = slot_map[i].size()/4;
+        int transactions = slotmap[i].size()/4;
         printf("Slot %d has %d transaction(s):\n", i, transactions);
-        // for(int j = 0; j < slot_map[i].size(); j++)
-        //     printf("%.0f ", slot_map[i][j]);
+        // for(int j = 0; j < slotmap[i].size(); j++)
+        //     printf("%.0f ", slotmap[i][j]);
         // printf("\n");
         for(int j = 0; j < transactions; j++)
         {
-            printf("Time: %.3f, Range %.0f.%.0f -> %.0f.%.0f\n",
-                    slot_map_time[i],
-                    slot_map[i][j*4], slot_map[i][j*4 + 2],
-                    slot_map[i][j*4 + 1], slot_map[i][j*4 + 3]);
+            printf("Time: %.3f, Range %d.%d -> %d.%d\n",
+                    slotmap_time[i],
+                    slotmap[i][j*4], slotmap[i][j*4 + 2],
+                    slotmap[i][j*4 + 1], slotmap[i][j*4 + 3]);
         }
     }
     cout << endl;
-//Get the slot map configuration
+//Get the slot map configuration---------------------------------------------------------------------
 
 
-//Get params of the ground truth topics
+//Get params of the ground truth topics--------------------------------------------------------------
     std::vector<std::string> ground_truth_topic_;
     if(rnsim_nh.getParam("/rnsim/ground_truth_topic", ground_truth_topic_))
     {
@@ -286,18 +321,52 @@ int main(int argc, char **argv)
         {
             printf("Node %d is updated by the topic \"%s\".\n", nodes_id[i], ground_truth_topic[i].c_str());
             ground_truth_sub[i] = rnsim_nh.subscribe<geometry_msgs::TransformStamped>
-                                             (ground_truth_topic[i], 1,
+                                             (ground_truth_topic[i], 100,
                                               boost::bind(&ground_truth_cb, _1, i));
             std::string gt_topic;
             std::stringstream ss;
             ss << nodes_id[i];
             gt_topic = ground_truth_topic[i] + std::string("_ground_truth_") + ss.str();
 
-            ground_truth_pub[i] = rnsim_nh.advertise<geometry_msgs::PoseStamped>(gt_topic, 1);
+            ground_truth_pub[i] = rnsim_nh.advertise<geometry_msgs::PoseStamped>(gt_topic, 100);
         }
     }
-//Get params of the ground truth topics
+    cout << endl;
+//Get params of the ground truth topics--------------------------------------------------------------
 
+    // while(ros::ok())
+    // {
+        // ros::spinOnce();
+
+        // static int slot_idx = 0;
+        // static ros::Time prev_time = ros::Time::now();
+
+        // printf("Slot: %d. Slot true time: %.3f. Intended time: %.3f\n",
+        //         slot_idx, (ros::Time::now() - prev_time).toSec(),
+        //         slotmap_time[slot_idx]);
+        // prev_time = ros::Time::now();
+        
+        // int transactions = slotmap[slot_idx].size()/4;
+        // if (transactions != 0)
+        // {
+        //     //Calculate the distance and publish
+        //     for(int j = 0; j < transactions; j++)
+        //     {
+        //         printf("Range %d.%d -> %d.%d\n",
+        //                 slotmap[slot_idx][j*4], slotmap[slot_idx][j*4 + 2],
+        //                 slotmap[slot_idx][j*4 + 1], slotmap[slot_idx][j*4 + 3]);        
+        //     }
+        // }
+
+        // // Increment the slot ID
+        // slot_idx++;
+        // if (slot_idx == slotmap_time.size())
+        //     slot_idx = 0;
+
+        // ros::Duration(slotmap_time[slot_idx]).sleep();
+    // }
+
+    rn_timer = rnsim_nh.createTimer(ros::Duration(slotmap_time[0]), timer_cb);
     ros::spin();
 
     return 0;
