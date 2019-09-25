@@ -6,7 +6,7 @@
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/TwistStamped.h"
 #include <geometry_msgs/TransformStamped.h>
-// #include <uwb_driver/UwbRange.h>
+#include <uwb_driver/UwbRange.h>
 
 #include <tf/transform_broadcaster.h>
 
@@ -27,7 +27,6 @@ std::vector<std::vector<double>> antennas_pos;
 
 // Slot map
 std::vector<std::vector<int>> slotmap;
-std::vector<std::vector<int>> slotmap_by_idx;
 std::vector<double> slotmap_time;
 
 // Ground truth topic
@@ -36,14 +35,27 @@ std::vector<ros::Subscriber> ground_truth_sub;
 std::vector<geometry_msgs::TransformStamped> nodes_info_msg;
 
 std::vector<ros::Publisher> ground_truth_pub;
-std::vector<geometry_msgs::PoseStamped> ground_truth_viz_msg;
+
+std::vector<ros::Publisher> range_pub;
 
 ros::Timer rn_timer;
+
+int find_node_idx(int node_id)
+{
+    auto node_id_it = std::find(std::begin(nodes_id), std::end(nodes_id), node_id);
+    if (node_id_it == std::end(nodes_id))
+        return -1;
+    else
+        return int(std::distance(nodes_id.begin(), node_id_it));
+}
 
 void ground_truth_cb(const geometry_msgs::TransformStamped::ConstPtr& msg, int i)
 {
     // printf("Received update for node %d\n", nodes_id[i]);
     nodes_info_msg[i] = *msg;
+
+    static std::vector<geometry_msgs::PoseStamped> ground_truth_viz_msg(nodes_id.size(),
+                                                                        geometry_msgs::PoseStamped());
     
     ground_truth_viz_msg[i].header = nodes_info_msg[i].header;
 
@@ -57,6 +69,10 @@ void ground_truth_cb(const geometry_msgs::TransformStamped::ConstPtr& msg, int i
     ground_truth_viz_msg[i].pose.orientation.w = nodes_info_msg[i].transform.rotation.w;
 
     ground_truth_pub[i].publish(ground_truth_viz_msg[i]);
+
+    nodes_pos[i*3]     = nodes_info_msg[i].transform.translation.x;
+    nodes_pos[i*3 + 1] = nodes_info_msg[i].transform.translation.y;
+    nodes_pos[i*3 + 2] = nodes_info_msg[i].transform.translation.z;
 
     return;
 }
@@ -77,11 +93,108 @@ void timer_cb(const ros::TimerEvent&)
         //Calculate the distance and publish
         for(int j = 0; j < transactions; j++)
         {
-            printf("Range %d.%d -> %d.%d\n",
-                    slotmap[slot_idx][j*4], slotmap[slot_idx][j*4 + 2],
-                    slotmap[slot_idx][j*4 + 1], slotmap[slot_idx][j*4 + 3]);        
+            int rqst_id = slotmap[slot_idx][j*4];
+            int rspd_id = slotmap[slot_idx][j*4 + 1];
+            int rqst_idx = find_node_idx(rqst_id);
+            int rspd_idx = find_node_idx(rspd_id);
+            int ant_rqst_idx = slotmap[slot_idx][j*4 + 2];
+            int ant_rspd_idx = slotmap[slot_idx][j*4 + 3];
+
+            bool rqst_pos_updated = (nodes_pos[rqst_idx*3] != 9999) &&
+                                   (nodes_pos[rqst_idx*3 + 1] != 9999) &&
+                                   (nodes_pos[rqst_idx*3 + 2] != 9999);
+            bool rsd_pos_updated = (nodes_pos[rspd_idx*3] != 9999) &&
+                                   (nodes_pos[rspd_idx*3 + 1] != 9999) &&
+                                   (nodes_pos[rspd_idx*3 + 2] != 9999);
+
+            bool node_pos_updated = rqst_pos_updated && rsd_pos_updated;
+
+            if(node_pos_updated)
+            {
+                Vector3d rqst_pos(nodes_pos[rqst_idx*3],
+                                 nodes_pos[rqst_idx*3 + 1],
+                                 nodes_pos[rqst_idx*3 + 2]);
+                Vector3d rqst_ant_pos(antennas_pos[rqst_idx][ant_rqst_idx*3],
+                                     antennas_pos[rqst_idx][ant_rqst_idx*3 + 1],
+                                     antennas_pos[rqst_idx][ant_rqst_idx*3 + 2]);
+                Eigen::Quaterniond rqst_quat(nodes_info_msg[rqst_idx].transform.rotation.w,
+                                            nodes_info_msg[rqst_idx].transform.rotation.x,
+                                            nodes_info_msg[rqst_idx].transform.rotation.y,
+                                            nodes_info_msg[rqst_idx].transform.rotation.z);
+
+                Vector3d rspd_pos(nodes_pos[rspd_idx*3],
+                                 nodes_pos[rspd_idx*3 + 1],
+                                 nodes_pos[rspd_idx*3 + 2]);
+                Vector3d rspd_ant_pos(antennas_pos[rspd_idx][ant_rspd_idx*3],
+                                     antennas_pos[rspd_idx][ant_rspd_idx*3 + 1],
+                                     antennas_pos[rspd_idx][ant_rspd_idx*3 + 2]);
+                Eigen::Quaterniond rspd_quat(nodes_info_msg[rspd_idx].transform.rotation.w,
+                                            nodes_info_msg[rspd_idx].transform.rotation.x,
+                                            nodes_info_msg[rspd_idx].transform.rotation.y,
+                                            nodes_info_msg[rspd_idx].transform.rotation.z);
+
+                double distance = (rqst_pos + rqst_quat.toRotationMatrix()*rqst_ant_pos - 
+                                  (rspd_pos + rspd_quat.toRotationMatrix()*rspd_ant_pos)).norm();
+
+                printf("Range %d.%d -> %d.%d:\n"
+                       "pi = (%.2f, %.2f, %.2f), "
+                       "pai = (%.2f, %.2f, %.2f), "
+                       "pj = (%.2f, %.2f, %.2f), "
+                       "paj = (%.2f, %.2f, %.2f), "
+                       "dij = %f\n",
+                        rqst_idx, ant_rqst_idx,
+                        rspd_idx, ant_rspd_idx,
+                        rqst_pos(0), rqst_pos(1), rqst_pos(2),
+                        rqst_ant_pos(0), rqst_ant_pos(1), rqst_ant_pos(2),
+                        rspd_pos(0), rspd_pos(1), rspd_pos(2),
+                        rspd_ant_pos(0), rspd_ant_pos(1), rspd_ant_pos(2),
+                        distance);
+
+                static std::vector<uwb_driver::UwbRange> uwb_range_info_msg(nodes_id.size(),
+                                                                            uwb_driver::UwbRange());
+
+                if (!range_pub[rqst_idx].getTopic().empty())
+                {
+                    uwb_range_info_msg[rqst_idx].header = std_msgs::Header();
+                    uwb_range_info_msg[rqst_idx].header.frame_id = "";
+                    uwb_range_info_msg[rqst_idx].header.stamp = ros::Time::now();
+                    uwb_range_info_msg[rqst_idx].header.seq++;
+
+                    uwb_range_info_msg[rqst_idx].requester_id = rqst_id;
+                    uwb_range_info_msg[rqst_idx].requester_idx = rqst_idx;
+                    uwb_range_info_msg[rqst_idx].responder_id = rspd_id;
+                    uwb_range_info_msg[rqst_idx].responder_idx = rspd_idx;
+                    uwb_range_info_msg[rqst_idx].requester_LED_flag = 1;
+                    uwb_range_info_msg[rqst_idx].responder_LED_flag = 1;
+                    uwb_range_info_msg[rqst_idx].noise = 0;
+                    uwb_range_info_msg[rqst_idx].vPeak = 32000;
+                    uwb_range_info_msg[rqst_idx].distance = distance;
+                    uwb_range_info_msg[rqst_idx].distance_err = 0.05;
+                    uwb_range_info_msg[rqst_idx].distance_dot = 0.0;
+                    uwb_range_info_msg[rqst_idx].distance_dot_err = 0.0;
+                    uwb_range_info_msg[rqst_idx].antenna = ant_rqst_idx << 4 | ant_rspd_idx;
+                    uwb_range_info_msg[rqst_idx].stopwatch_time = 123;
+                    uwb_range_info_msg[rqst_idx].uwb_time = (uint32_t)(ros::Time::now().toSec()*1000);
+                    uwb_range_info_msg[rqst_idx].responder_location.x = rspd_pos(0);
+                    uwb_range_info_msg[rqst_idx].responder_location.y = rspd_pos(1);
+                    uwb_range_info_msg[rqst_idx].responder_location.z = rspd_pos(2);
+                    uwb_range_info_msg[rqst_idx].antenna_offset.x = rspd_ant_pos(0);
+                    uwb_range_info_msg[rqst_idx].antenna_offset.y = rspd_ant_pos(1);
+                    uwb_range_info_msg[rqst_idx].antenna_offset.z = rspd_ant_pos(2);
+
+                    range_pub[rqst_idx].publish(uwb_range_info_msg[rqst_idx]);
+                }
+            }
+            else
+            {
+                printf("Range %d.%d -> %d.%d:\n"
+                       "Node position not yet updated. Skipping.\n",
+                       rqst_idx, slotmap[slot_idx][j*4 + 2],
+                       rspd_idx, slotmap[slot_idx][j*4 + 3]);
+            }
         }
     }
+    cout << endl;
 
     // Increment the slot ID
     slot_idx++;
@@ -132,7 +245,7 @@ int main(int argc, char **argv)
                 nodes_info_msg.push_back(geometry_msgs::TransformStamped());
 
                 ground_truth_pub.push_back(ros::Publisher());
-                ground_truth_viz_msg.push_back(geometry_msgs::PoseStamped());
+                range_pub.push_back(ros::Publisher());
             }
         }
         else
@@ -167,8 +280,8 @@ int main(int argc, char **argv)
         while(true)
         {
             int node_id = int(antennas_pos_[i]);
-            auto node_id_it = std::find(std::begin(nodes_id), std::end(nodes_id), node_id);
-            if (node_id_it != std::end(nodes_id))
+            int node_idx = find_node_idx(node_id);
+            if (node_idx != -1)
             {
                 int node_antennas = int(antennas_pos_[i+1]);
                 for(int j = 0; j < node_antennas; j++)
@@ -177,7 +290,6 @@ int main(int argc, char **argv)
                     auto y = antennas_pos_[i + 2 + j*3 + 1];
                     auto z = antennas_pos_[i + 2 + j*3 + 2];
                     // printf("%.2f, %.2f, %.2f\n", x, y, z);
-                    auto node_idx = std::distance(nodes_id.begin(), node_id_it);
 
                     antennas_pos[node_idx].push_back(x);
                     antennas_pos[node_idx].push_back(y);
@@ -312,7 +424,7 @@ int main(int argc, char **argv)
         exit(-4);
     }
 
-    // Create the 
+    // Create the ground truth topic
     for(int i = 0; i < ground_truth_topic.size(); i++)
     {
         if(ground_truth_topic[i].empty())
@@ -334,6 +446,26 @@ int main(int argc, char **argv)
     cout << endl;
 //Get params of the ground truth topics--------------------------------------------------------------
 
+
+//Create the range topic for requester nodes---------------------------------------------------------
+    for(int i = 0; i < slotmap.size(); i++)
+    {
+        int transactions = slotmap[i].size()/4;
+        if (transactions != 0)
+        {
+            for(int j = 0; j < transactions; j++)
+            {
+                int rqst_idx = find_node_idx(slotmap[i][j*4]);
+                std::stringstream ss;
+                ss << nodes_id[rqst_idx];
+                if (range_pub[rqst_idx].getTopic().empty())
+                    range_pub[rqst_idx] = rnsim_nh.advertise<uwb_driver::UwbRange>(std::string("/uwb_endorange_info_")
+                                                                            + ss.str(), 100);
+            }
+        }
+    }
+
+//Create the range topic for requester nodes---------------------------------------------------------
     // while(ros::ok())
     // {
         // ros::spinOnce();
