@@ -146,7 +146,8 @@ void timer_cb(const ros::TimerEvent&)
                 {
 
                     static random_device rd{};
-                    static vector<std::mt19937> loss_gen(nodes_id.size(), mt19937(rd()));
+                    static vector<std::mt19937>
+                                loss_gen(nodes_id.size(), mt19937(rd()));
                     static vector<uniform_real_distribution<>>
                                 loss_dice(nodes_id.size(),
                                           uniform_real_distribution<>(0, 1.0));
