@@ -41,3 +41,8 @@ rnsim:
     # follow
     ground_truth_topic:
         ["200", "/vicon/firefly_sbx/firefly_sbx"]
+    # Ranging noise mean and std
+    range_noise_gaussian: [0.00, 0.05]
+    # Ranging loss rate
+    loss_chance: 0.05
+

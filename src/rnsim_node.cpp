@@ -40,6 +40,9 @@ std::vector<ros::Publisher> range_pub;
 
 ros::Timer rn_timer;
 
+double loss_chance;
+vector<double> range_noise_gaussian;
+
 int find_node_idx(int node_id)
 {
     auto node_id_it = std::find(std::begin(nodes_id), std::end(nodes_id), node_id);
@@ -136,53 +139,78 @@ void timer_cb(const ros::TimerEvent&)
                 double distance = (rqst_pos + rqst_quat.toRotationMatrix()*rqst_ant_pos - 
                                   (rspd_pos + rspd_quat.toRotationMatrix()*rspd_ant_pos)).norm();
 
-                printf("Range %d.%d -> %d.%d:\n"
-                       "pi = (%.2f, %.2f, %.2f), "
-                       "pai = (%.2f, %.2f, %.2f), "
-                       "pj = (%.2f, %.2f, %.2f), "
-                       "paj = (%.2f, %.2f, %.2f), "
-                       "dij = %f\n",
-                        rqst_idx, ant_rqst_idx,
-                        rspd_idx, ant_rspd_idx,
-                        rqst_pos(0), rqst_pos(1), rqst_pos(2),
-                        rqst_ant_pos(0), rqst_ant_pos(1), rqst_ant_pos(2),
-                        rspd_pos(0), rspd_pos(1), rspd_pos(2),
-                        rspd_ant_pos(0), rspd_ant_pos(1), rspd_ant_pos(2),
-                        distance);
-
                 static std::vector<uwb_driver::UwbRange> uwb_range_info_msg(nodes_id.size(),
                                                                             uwb_driver::UwbRange());
 
                 if (!range_pub[rqst_idx].getTopic().empty())
                 {
-                    uwb_range_info_msg[rqst_idx].header = std_msgs::Header();
-                    uwb_range_info_msg[rqst_idx].header.frame_id = "";
-                    uwb_range_info_msg[rqst_idx].header.stamp = ros::Time::now();
-                    uwb_range_info_msg[rqst_idx].header.seq++;
 
-                    uwb_range_info_msg[rqst_idx].requester_id = rqst_id;
-                    uwb_range_info_msg[rqst_idx].requester_idx = rqst_idx;
-                    uwb_range_info_msg[rqst_idx].responder_id = rspd_id;
-                    uwb_range_info_msg[rqst_idx].responder_idx = rspd_idx;
-                    uwb_range_info_msg[rqst_idx].requester_LED_flag = 1;
-                    uwb_range_info_msg[rqst_idx].responder_LED_flag = 1;
-                    uwb_range_info_msg[rqst_idx].noise = 0;
-                    uwb_range_info_msg[rqst_idx].vPeak = 32000;
-                    uwb_range_info_msg[rqst_idx].distance = distance;
-                    uwb_range_info_msg[rqst_idx].distance_err = 0.05;
-                    uwb_range_info_msg[rqst_idx].distance_dot = 0.0;
-                    uwb_range_info_msg[rqst_idx].distance_dot_err = 0.0;
-                    uwb_range_info_msg[rqst_idx].antenna = ant_rqst_idx << 4 | ant_rspd_idx;
-                    uwb_range_info_msg[rqst_idx].stopwatch_time = 123;
-                    uwb_range_info_msg[rqst_idx].uwb_time = (uint32_t)(ros::Time::now().toSec()*1000);
-                    uwb_range_info_msg[rqst_idx].responder_location.x = rspd_pos(0);
-                    uwb_range_info_msg[rqst_idx].responder_location.y = rspd_pos(1);
-                    uwb_range_info_msg[rqst_idx].responder_location.z = rspd_pos(2);
-                    uwb_range_info_msg[rqst_idx].antenna_offset.x = rspd_ant_pos(0);
-                    uwb_range_info_msg[rqst_idx].antenna_offset.y = rspd_ant_pos(1);
-                    uwb_range_info_msg[rqst_idx].antenna_offset.z = rspd_ant_pos(2);
+                    static random_device rd{};
+                    static vector<std::mt19937> loss_gen(nodes_id.size(), mt19937(rd()));
+                    static vector<uniform_real_distribution<>>
+                                loss_dice(nodes_id.size(),
+                                          uniform_real_distribution<>(0, 1.0));
 
-                    range_pub[rqst_idx].publish(uwb_range_info_msg[rqst_idx]);
+                    static vector<mt19937>
+                                dist_err_gen(nodes_id.size(), mt19937(rd()));
+
+                    static vector<normal_distribution<double>>
+                                dist_err(nodes_id.size(),
+                                         normal_distribution<double>
+                                            (range_noise_gaussian[0],
+                                             range_noise_gaussian[1]));
+
+                    double loss_dice_value = loss_dice[rqst_idx](loss_gen[rqst_idx]);
+
+                    if(loss_dice_value < 1.0 - loss_chance)
+                    {
+
+                        double distance_err = dist_err[rqst_idx](dist_err_gen[rqst_idx]);
+
+                        uwb_range_info_msg[rqst_idx].header = std_msgs::Header();
+                        uwb_range_info_msg[rqst_idx].header.frame_id = "";
+                        uwb_range_info_msg[rqst_idx].header.stamp = ros::Time::now();
+                        uwb_range_info_msg[rqst_idx].header.seq++;
+
+                        uwb_range_info_msg[rqst_idx].requester_id = rqst_id;
+                        uwb_range_info_msg[rqst_idx].requester_idx = rqst_idx;
+                        uwb_range_info_msg[rqst_idx].responder_id = rspd_id;
+                        uwb_range_info_msg[rqst_idx].responder_idx = rspd_idx;
+                        uwb_range_info_msg[rqst_idx].requester_LED_flag = 1;
+                        uwb_range_info_msg[rqst_idx].responder_LED_flag = 1;
+                        uwb_range_info_msg[rqst_idx].noise = 0;
+                        uwb_range_info_msg[rqst_idx].vPeak = 32000;
+                        uwb_range_info_msg[rqst_idx].distance = distance + distance_err;
+                        uwb_range_info_msg[rqst_idx].distance_err = 0.05;
+                        uwb_range_info_msg[rqst_idx].distance_dot = 0.0;
+                        uwb_range_info_msg[rqst_idx].distance_dot_err = 0.0;
+                        uwb_range_info_msg[rqst_idx].antenna = ant_rqst_idx << 4 | ant_rspd_idx;
+                        uwb_range_info_msg[rqst_idx].stopwatch_time = 123;
+                        uwb_range_info_msg[rqst_idx].uwb_time = (uint32_t)(ros::Time::now().toSec()*1000);
+                        uwb_range_info_msg[rqst_idx].responder_location.x = rspd_pos(0);
+                        uwb_range_info_msg[rqst_idx].responder_location.y = rspd_pos(1);
+                        uwb_range_info_msg[rqst_idx].responder_location.z = rspd_pos(2);
+                        uwb_range_info_msg[rqst_idx].antenna_offset.x = rspd_ant_pos(0);
+                        uwb_range_info_msg[rqst_idx].antenna_offset.y = rspd_ant_pos(1);
+                        uwb_range_info_msg[rqst_idx].antenna_offset.z = rspd_ant_pos(2);
+
+                        range_pub[rqst_idx].publish(uwb_range_info_msg[rqst_idx]);
+
+                        printf("Range %d.%d -> %d.%d:\n"
+                               "pi = (%.2f, %.2f, %.2f), "
+                               "pai = (%.2f, %.2f, %.2f), "
+                               "pj = (%.2f, %.2f, %.2f), "
+                               "paj = (%.2f, %.2f, %.2f), "
+                               "dij = %f, "
+                               "dij_sent = %f\n",
+                                rqst_idx, ant_rqst_idx,
+                                rspd_idx, ant_rspd_idx,
+                                rqst_pos(0), rqst_pos(1), rqst_pos(2),
+                                rqst_ant_pos(0), rqst_ant_pos(1), rqst_ant_pos(2),
+                                rspd_pos(0), rspd_pos(1), rspd_pos(2),
+                                rspd_ant_pos(0), rspd_ant_pos(1), rspd_ant_pos(2),
+                                distance, uwb_range_info_msg[rqst_idx].distance);
+                    }
                 }
             }
             else
@@ -212,7 +240,7 @@ int main(int argc, char **argv)
     ros::NodeHandle rnsim_nh("~");
 
 //Get all the node IDs-------------------------------------------------------------------------------
-    if(rnsim_nh.getParam("/rnsim/nodes_id", nodes_id))
+    if(rnsim_nh.getParam("nodes_id", nodes_id))
     {
         nodes_total = nodes_id.size();
 
@@ -231,7 +259,7 @@ int main(int argc, char **argv)
 
 
 //Get params of the node positions, and create vectors to hold corresponding object------------------
-    if(rnsim_nh.getParam("/rnsim/nodes_pos", nodes_pos))
+    if(rnsim_nh.getParam("nodes_pos", nodes_pos))
     {
         if (nodes_total == nodes_pos.size()/3)
         {
@@ -258,7 +286,7 @@ int main(int argc, char **argv)
     else
     {
         printf( "No node position declared. Exit...\n");
-        exit(-2);
+        exit(-3);
     }
     cout << endl;
 //Get params of the node positions, and create vectors to hold corresponding object------------------
@@ -266,7 +294,7 @@ int main(int argc, char **argv)
 
 //Get the antenna configurations---------------------------------------------------------------------
     std::vector<double> antennas_pos_;
-    if(rnsim_nh.getParam("/rnsim/antennas_pos", antennas_pos_))
+    if(rnsim_nh.getParam("antennas_pos", antennas_pos_))
     {
         // printf("Obtained antenna positions:\n");
         // for(int i = 0; i < antennas_pos_.size()-1; i++)
@@ -342,7 +370,7 @@ int main(int argc, char **argv)
 
 //Get the slot map configuration---------------------------------------------------------------------
     std::vector<double> slotmap_;
-    if(rnsim_nh.getParam("/rnsim/slotmap", slotmap_))
+    if(rnsim_nh.getParam("slotmap", slotmap_))
     {
         int i = 0;
         while(true)
@@ -370,7 +398,7 @@ int main(int argc, char **argv)
     else
     {
         printf("No slot map declared. Exitting.\n");
-        exit(-3);
+        exit(-4);
     }
 
     for(int i = 0; i < slotmap.size(); i++)
@@ -394,7 +422,7 @@ int main(int argc, char **argv)
 
 //Get params of the ground truth topics--------------------------------------------------------------
     std::vector<std::string> ground_truth_topic_;
-    if(rnsim_nh.getParam("/rnsim/ground_truth_topic", ground_truth_topic_))
+    if(rnsim_nh.getParam("ground_truth_topic", ground_truth_topic_))
     {
         int i = 0;
         while(true)
@@ -421,7 +449,7 @@ int main(int argc, char **argv)
     else
     {
         printf("No ground truth declared. Exitting.\n");
-        exit(-4);
+        exit(-5);
     }
 
     // Create the ground truth topic
@@ -464,8 +492,39 @@ int main(int argc, char **argv)
             }
         }
     }
-
 //Create the range topic for requester nodes---------------------------------------------------------
+
+//Create some random generators----------------------------------------------------------------------
+    if(rnsim_nh.getParam("loss_chance", loss_chance))
+    {
+        if (0.0 <= loss_chance && loss_chance < 1.0)
+            printf("Ranging loss rate: %d", int(loss_chance*100));
+        else
+        {
+            printf("Ranging loss rate not well-defined. Exitting\n");
+            exit(-6);
+        }
+    }
+    else
+    {
+        printf("Ranging loss rate not declared. Exitting.\n");
+        exit(-7);
+    }
+
+    if(rnsim_nh.getParam("range_noise_gaussian", range_noise_gaussian))
+    {
+        printf("Ranging noise declared, mean %f, std: %f.\n",
+                range_noise_gaussian[0],
+                range_noise_gaussian[1]);
+    }
+    else
+    {
+        printf("Ranging noise not declared. Exitting.\n");
+        exit(-9);
+    }
+    printf("Hello 6\n");
+//Create some random generators----------------------------------------------------------------------
+    
     // while(ros::ok())
     // {
         // ros::spinOnce();

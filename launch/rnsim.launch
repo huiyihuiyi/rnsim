@@ -2,7 +2,7 @@
 <launch>
 
 	<rosparam file="$(find rnsim)/cfg/rnsim_network_config.yaml" command="load" />
-	<node respawn="true" pkg="rnsim" type="rnsim_node" name="rnsim_node" output="screen">
+	<node respawn="true" pkg="rnsim" type="rnsim_node" name="rnsim" output="screen">
 	</node>
   
 </launch>
