@@ -104,8 +104,8 @@ void timer_cb(const ros::TimerEvent&)
             int ant_rspd_idx = slotmap[slot_idx][j*4 + 3];
 
             bool rqst_pos_updated = (nodes_pos[rqst_idx*3] != 9999) &&
-                                   (nodes_pos[rqst_idx*3 + 1] != 9999) &&
-                                   (nodes_pos[rqst_idx*3 + 2] != 9999);
+                                    (nodes_pos[rqst_idx*3 + 1] != 9999) &&
+                                    (nodes_pos[rqst_idx*3 + 2] != 9999);
             bool rsd_pos_updated = (nodes_pos[rspd_idx*3] != 9999) &&
                                    (nodes_pos[rspd_idx*3 + 1] != 9999) &&
                                    (nodes_pos[rspd_idx*3 + 2] != 9999);
@@ -115,26 +115,26 @@ void timer_cb(const ros::TimerEvent&)
             if(node_pos_updated)
             {
                 Vector3d rqst_pos(nodes_pos[rqst_idx*3],
-                                 nodes_pos[rqst_idx*3 + 1],
-                                 nodes_pos[rqst_idx*3 + 2]);
+                                  nodes_pos[rqst_idx*3 + 1],
+                                  nodes_pos[rqst_idx*3 + 2]);
                 Vector3d rqst_ant_pos(antennas_pos[rqst_idx][ant_rqst_idx*3],
-                                     antennas_pos[rqst_idx][ant_rqst_idx*3 + 1],
-                                     antennas_pos[rqst_idx][ant_rqst_idx*3 + 2]);
+                                      antennas_pos[rqst_idx][ant_rqst_idx*3 + 1],
+                                      antennas_pos[rqst_idx][ant_rqst_idx*3 + 2]);
                 Eigen::Quaterniond rqst_quat(nodes_info_msg[rqst_idx].transform.rotation.w,
-                                            nodes_info_msg[rqst_idx].transform.rotation.x,
-                                            nodes_info_msg[rqst_idx].transform.rotation.y,
-                                            nodes_info_msg[rqst_idx].transform.rotation.z);
+                                             nodes_info_msg[rqst_idx].transform.rotation.x,
+                                             nodes_info_msg[rqst_idx].transform.rotation.y,
+                                             nodes_info_msg[rqst_idx].transform.rotation.z);
 
                 Vector3d rspd_pos(nodes_pos[rspd_idx*3],
-                                 nodes_pos[rspd_idx*3 + 1],
-                                 nodes_pos[rspd_idx*3 + 2]);
+                                  nodes_pos[rspd_idx*3 + 1],
+                                  nodes_pos[rspd_idx*3 + 2]);
                 Vector3d rspd_ant_pos(antennas_pos[rspd_idx][ant_rspd_idx*3],
-                                     antennas_pos[rspd_idx][ant_rspd_idx*3 + 1],
-                                     antennas_pos[rspd_idx][ant_rspd_idx*3 + 2]);
+                                      antennas_pos[rspd_idx][ant_rspd_idx*3 + 1],
+                                      antennas_pos[rspd_idx][ant_rspd_idx*3 + 2]);
                 Eigen::Quaterniond rspd_quat(nodes_info_msg[rspd_idx].transform.rotation.w,
-                                            nodes_info_msg[rspd_idx].transform.rotation.x,
-                                            nodes_info_msg[rspd_idx].transform.rotation.y,
-                                            nodes_info_msg[rspd_idx].transform.rotation.z);
+                                             nodes_info_msg[rspd_idx].transform.rotation.x,
+                                             nodes_info_msg[rspd_idx].transform.rotation.y,
+                                             nodes_info_msg[rspd_idx].transform.rotation.z);
 
                 double distance = (rqst_pos + rqst_quat.toRotationMatrix()*rqst_ant_pos - 
                                   (rspd_pos + rspd_quat.toRotationMatrix()*rspd_ant_pos)).norm();
@@ -523,7 +523,6 @@ int main(int argc, char **argv)
         printf("Ranging noise not declared. Exitting.\n");
         exit(-9);
     }
-    printf("Hello 6\n");
 //Create some random generators----------------------------------------------------------------------
     
     // while(ros::ok())
