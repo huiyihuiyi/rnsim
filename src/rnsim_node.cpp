@@ -33,6 +33,7 @@ std::vector<double> slotmap_time;
 std::vector<std::string> ground_truth_topic;
 std::vector<ros::Subscriber> ground_truth_sub;
 std::vector<geometry_msgs::TransformStamped> nodes_info_msg;
+std::vector<bool> nodes_info_new;
 
 std::vector<ros::Publisher> ground_truth_pub;
 
@@ -56,6 +57,7 @@ void ground_truth_cb(const geometry_msgs::TransformStamped::ConstPtr& msg, int i
 {
     // printf("Received update for node %d\n", nodes_id[i]);
     nodes_info_msg[i] = *msg;
+    nodes_info_new[i] = true;
 
     static std::vector<geometry_msgs::PoseStamped> ground_truth_viz_msg(nodes_id.size(),
                                                                         geometry_msgs::PoseStamped());
@@ -106,14 +108,16 @@ void timer_cb(const ros::TimerEvent&)
             bool rqst_pos_updated = (nodes_pos[rqst_idx*3] != 9999) &&
                                     (nodes_pos[rqst_idx*3 + 1] != 9999) &&
                                     (nodes_pos[rqst_idx*3 + 2] != 9999);
-            bool rsd_pos_updated = (nodes_pos[rspd_idx*3] != 9999) &&
-                                   (nodes_pos[rspd_idx*3 + 1] != 9999) &&
-                                   (nodes_pos[rspd_idx*3 + 2] != 9999);
+            bool rspd_pos_updated = (nodes_pos[rspd_idx*3] != 9999) &&
+                                    (nodes_pos[rspd_idx*3 + 1] != 9999) &&
+                                    (nodes_pos[rspd_idx*3 + 2] != 9999);
 
-            bool node_pos_updated = rqst_pos_updated && rsd_pos_updated;
+            bool node_pos_updated = rqst_pos_updated && rspd_pos_updated && nodes_info_new[rqst_idx];
 
             if(node_pos_updated)
             {
+                nodes_info_new[rqst_idx] = false;
+
                 Vector3d rqst_pos(nodes_pos[rqst_idx*3],
                                   nodes_pos[rqst_idx*3 + 1],
                                   nodes_pos[rqst_idx*3 + 2]);
@@ -166,11 +170,9 @@ void timer_cb(const ros::TimerEvent&)
                     if(loss_dice_value < 1.0 - loss_chance)
                     {
 
-                        double distance_err = dist_err[rqst_idx](dist_err_gen[rqst_idx]);
-
                         uwb_range_info_msg[rqst_idx].header = std_msgs::Header();
                         uwb_range_info_msg[rqst_idx].header.frame_id = "";
-                        uwb_range_info_msg[rqst_idx].header.stamp = ros::Time::now();
+                        uwb_range_info_msg[rqst_idx].header.stamp = nodes_info_msg[rqst_idx].header.stamp;//ros::Time::now();
                         uwb_range_info_msg[rqst_idx].header.seq++;
 
                         uwb_range_info_msg[rqst_idx].requester_id = rqst_id;
@@ -181,7 +183,7 @@ void timer_cb(const ros::TimerEvent&)
                         uwb_range_info_msg[rqst_idx].responder_LED_flag = 1;
                         uwb_range_info_msg[rqst_idx].noise = 0;
                         uwb_range_info_msg[rqst_idx].vPeak = 32000;
-                        uwb_range_info_msg[rqst_idx].distance = distance + distance_err;
+                        uwb_range_info_msg[rqst_idx].distance = distance + dist_err[rqst_idx](dist_err_gen[rqst_idx]);;
                         uwb_range_info_msg[rqst_idx].distance_err = 0.05;
                         uwb_range_info_msg[rqst_idx].distance_dot = 0.0;
                         uwb_range_info_msg[rqst_idx].distance_dot_err = 0.0;
@@ -272,6 +274,7 @@ int main(int argc, char **argv)
                 ground_truth_topic.push_back(std::string(""));
                 ground_truth_sub.push_back(ros::Subscriber());
                 nodes_info_msg.push_back(geometry_msgs::TransformStamped());
+                nodes_info_new.push_back(false);
 
                 ground_truth_pub.push_back(ros::Publisher());
                 range_pub.push_back(ros::Publisher());

@@ -10,9 +10,9 @@ rnsim:
     # startup. If the node's coordinate is undetermined on startup, put 9999
     # into it.
     nodes_pos:
-        [5,  5, 1,
-         -5, 5, 0,
-         -5, -5, 1,
+        [5,   5, 1,
+        -5,   5, 0,
+        -5,  -5, 1,
          5,  -5, 0,
          9999, 9999, 9999
         ]
@@ -22,21 +22,21 @@ rnsim:
     # assumed to have a single antenna at its origin
     antennas_pos:
         [200, 2, 0.0, 0.25, 0.0, 0.0, -0.25, 0.0,
-         201, 2, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0]
+         201, 2, 0.0, 0.0,  0.0, 0.0,  0.25, 0.0]
     # Slot map, each row starts with the slot ID, followed by requestor ID,
     # responder ID, requester antenna ID, responder antenna ID, and time period.
     # If two transactions occur at the same time, the time period of the firstly
     # declared transaction is the time period of the slot.
     slotmap:
-        [0, 200, 100, 0, 0, 0.025,
-         1, 101, 102, 0, 0, 0.025,
-         1, 200, 100, 1, 0, 0.025,
-         2, 200, 101, 0, 0, 0.025,
-         3, 200, 101, 1, 0, 0.025,
-         4, 200, 102, 0, 0, 0.025,
-         5, 200, 102, 1, 0, 0.025,
-         6, 200, 103, 0, 0, 0.025,
-         7, 200, 103, 1, 0, 0.025]
+        [0, 200, 100, 0, 0, 0.05,
+         1, 101, 102, 0, 0, 0.05,
+         1, 200, 100, 1, 0, 0.05,
+         2, 200, 101, 0, 0, 0.05,
+         3, 200, 101, 1, 0, 0.05,
+         4, 200, 102, 0, 0, 0.05,
+         5, 200, 102, 1, 0, 0.05,
+         6, 200, 103, 0, 0, 0.05,
+         7, 200, 103, 1, 0, 0.05]
     # Name of topics for ground truth, each row specify the ID of the node
     # follow
     ground_truth_topic:
