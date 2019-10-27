@@ -25,18 +25,30 @@ int nodes_total = 0;
 // Listing the position of the antenna node
 std::vector<std::vector<double>> antennas_pos;
 
+// The transform between ground truth body and true body
+map<int, Matrix<double, 3, 3> > R_V_B;
+map<int, Matrix<double, 3, 1> > t_V_B;
+
+
 // Slot map
 std::vector<std::vector<int>> slotmap;
 std::vector<double> slotmap_time;
 
 // Ground truth topic
 std::vector<std::string> ground_truth_topic;
-std::vector<ros::Subscriber> ground_truth_sub;
+
 std::vector<geometry_msgs::TransformStamped> nodes_info_msg;
 std::vector<bool> nodes_info_new;
 
-std::vector<ros::Publisher> ground_truth_pub;
+// Subscriber of ground truth topic
+std::vector<ros::Subscriber> ground_truth_sub;
 
+// Publisher of ground truth in rviz viewable format
+std::vector<ros::Publisher> ground_truth_pub;
+//Publish of the ground truth converted to the body frame
+std::vector<ros::Publisher> ground_truth_body_pub;
+
+// Publisher of the distance
 std::vector<ros::Publisher> range_pub;
 
 ros::Timer rn_timer;
@@ -74,6 +86,35 @@ void ground_truth_cb(const geometry_msgs::TransformStamped::ConstPtr& msg, int i
     ground_truth_viz_msg[i].pose.orientation.w = nodes_info_msg[i].transform.rotation.w;
 
     ground_truth_pub[i].publish(ground_truth_viz_msg[i]);
+
+
+    // Calculate the body frame pose
+    Vector3d p_W_V(nodes_info_msg[i].transform.translation.x,
+                   nodes_info_msg[i].transform.translation.y,
+                   nodes_info_msg[i].transform.translation.z);
+
+    Quaterniond q_W_V(nodes_info_msg[i].transform.rotation.w,
+                      nodes_info_msg[i].transform.rotation.x,
+                      nodes_info_msg[i].transform.rotation.y,
+                      nodes_info_msg[i].transform.rotation.z);
+
+    int node_id = nodes_id[i];
+
+    Quaterniond q_W_B = q_W_V*Quaterniond(R_V_B[node_id]);
+    Vector3d t_W_B    = q_W_V.toRotationMatrix()*t_V_B[node_id];
+
+    Vector3d p_W_B = p_W_V + t_W_B;
+
+    ground_truth_viz_msg[i].pose.position.x = p_W_B.x();
+    ground_truth_viz_msg[i].pose.position.y = p_W_B.y();
+    ground_truth_viz_msg[i].pose.position.z = p_W_B.z();
+
+    ground_truth_viz_msg[i].pose.orientation.x = q_W_B.x();
+    ground_truth_viz_msg[i].pose.orientation.y = q_W_B.y();
+    ground_truth_viz_msg[i].pose.orientation.z = q_W_B.z();
+    ground_truth_viz_msg[i].pose.orientation.w = q_W_B.w();
+
+    ground_truth_body_pub[i].publish(ground_truth_viz_msg[i]);
 
     nodes_pos[i*3]     = nodes_info_msg[i].transform.translation.x;
     nodes_pos[i*3 + 1] = nodes_info_msg[i].transform.translation.y;
@@ -140,8 +181,16 @@ void timer_cb(const ros::TimerEvent&)
                                              nodes_info_msg[rspd_idx].transform.rotation.y,
                                              nodes_info_msg[rspd_idx].transform.rotation.z);
 
-                double distance = (rqst_pos + rqst_quat.toRotationMatrix()*rqst_ant_pos - 
-                                  (rspd_pos + rspd_quat.toRotationMatrix()*rspd_ant_pos)).norm();
+                // Transform the rqst_pos and the rspd_pos from the vicon body to the true body
+                Quaterniond quat_W_B_rqst = rqst_quat*Quaterniond(R_V_B[rqst_id]);
+                Quaterniond quat_W_B_rspd = rspd_quat*Quaterniond(R_V_B[rspd_id]);
+
+                rqst_pos = rqst_pos + rqst_quat.toRotationMatrix()*t_V_B[rqst_id];
+                rspd_pos = rspd_pos + rspd_quat.toRotationMatrix()*t_V_B[rspd_id];
+
+
+                double distance = (rqst_pos + quat_W_B_rqst.toRotationMatrix()*rqst_ant_pos - 
+                                  (rspd_pos + quat_W_B_rspd.toRotationMatrix()*rspd_ant_pos)).norm();
 
                 static std::vector<uwb_driver::UwbRange> uwb_range_info_msg(nodes_id.size(),
                                                                             uwb_driver::UwbRange());
@@ -183,8 +232,8 @@ void timer_cb(const ros::TimerEvent&)
                         uwb_range_info_msg[rqst_idx].responder_LED_flag = 1;
                         uwb_range_info_msg[rqst_idx].noise = 0;
                         uwb_range_info_msg[rqst_idx].vPeak = 32000;
-                        uwb_range_info_msg[rqst_idx].distance = distance + dist_err[rqst_idx](dist_err_gen[rqst_idx]);;
-                        uwb_range_info_msg[rqst_idx].distance_err = 0.05;
+                        uwb_range_info_msg[rqst_idx].distance = distance + dist_err[rqst_idx](dist_err_gen[rqst_idx]);
+                        uwb_range_info_msg[rqst_idx].distance_err = dist_err[rqst_idx](dist_err_gen[rqst_idx]);
                         uwb_range_info_msg[rqst_idx].distance_dot = 0.0;
                         uwb_range_info_msg[rqst_idx].distance_dot_err = 0.0;
                         uwb_range_info_msg[rqst_idx].antenna = ant_rqst_idx << 4 | ant_rspd_idx;
@@ -193,9 +242,9 @@ void timer_cb(const ros::TimerEvent&)
                         uwb_range_info_msg[rqst_idx].responder_location.x = rspd_pos(0);
                         uwb_range_info_msg[rqst_idx].responder_location.y = rspd_pos(1);
                         uwb_range_info_msg[rqst_idx].responder_location.z = rspd_pos(2);
-                        uwb_range_info_msg[rqst_idx].antenna_offset.x = rspd_ant_pos(0);
-                        uwb_range_info_msg[rqst_idx].antenna_offset.y = rspd_ant_pos(1);
-                        uwb_range_info_msg[rqst_idx].antenna_offset.z = rspd_ant_pos(2);
+                        uwb_range_info_msg[rqst_idx].antenna_offset.x = rqst_ant_pos(0);
+                        uwb_range_info_msg[rqst_idx].antenna_offset.y = rqst_ant_pos(1);
+                        uwb_range_info_msg[rqst_idx].antenna_offset.z = rqst_ant_pos(2);
 
                         range_pub[rqst_idx].publish(uwb_range_info_msg[rqst_idx]);
 
@@ -277,6 +326,8 @@ int main(int argc, char **argv)
                 nodes_info_new.push_back(false);
 
                 ground_truth_pub.push_back(ros::Publisher());
+                ground_truth_body_pub.push_back(ros::Publisher());
+
                 range_pub.push_back(ros::Publisher());
             }
         }
@@ -370,6 +421,43 @@ int main(int argc, char **argv)
     }
     cout << endl;
 //Get the antenna configurations---------------------------------------------------------------------
+
+
+// Get the body transform----------------------------------------------------------------------------
+    for(int i = 0; i < nodes_total; i++)
+    {
+        R_V_B.insert(make_pair(nodes_id[i], Matrix3d::Identity()));
+        t_V_B.insert(make_pair(nodes_id[i], Matrix<double, 3, 1>(0, 0, 0)));
+    }
+    std::vector<double> T_V_B;
+    if(rnsim_nh.getParam("T_V_B", T_V_B))
+    {
+        const int TF_LEN = 17;
+        int tfs = T_V_B.size()/TF_LEN;
+        printf("Received transforms for %d node(s).\n", tfs); // 4x4 matrix plus one ID;
+        for(int i = 0; i < tfs; i++)
+        {
+            int node_id = T_V_B[i*TF_LEN];
+
+            Matrix<double, 4, 4> tf = Matrix<double, 4, 4, RowMajor>(&T_V_B[i*TF_LEN + 1]);
+
+            R_V_B[ node_id ] = tf.block<3, 3>(0, 0);
+
+            t_V_B[ node_id ] = tf.block<3, 1>(0, 3);
+
+            printf("Node %d, T, R and t:\n", node_id);
+            cout << tf << endl;
+            cout << R_V_B[ node_id ] << endl;
+            cout << t_V_B[ node_id ] << endl;
+        }
+    }
+    else
+    {
+        printf("No body transform declared. All transforms are indentity\n");
+    }
+// Get the body transform----------------------------------------------------------------------------
+
+
 
 
 //Get the slot map configuration---------------------------------------------------------------------
@@ -470,9 +558,13 @@ int main(int argc, char **argv)
             std::string gt_topic;
             std::stringstream ss;
             ss << nodes_id[i];
-            gt_topic = ground_truth_topic[i] + std::string("_ground_truth_") + ss.str();
 
+            gt_topic = ground_truth_topic[i] + std::string("_ground_truth_") + ss.str();
             ground_truth_pub[i] = rnsim_nh.advertise<geometry_msgs::PoseStamped>(gt_topic, 100);
+
+            gt_topic = ground_truth_topic[i] + std::string("_ground_truth_body_") + ss.str();
+            ground_truth_body_pub[i] = rnsim_nh.advertise<geometry_msgs::PoseStamped>(gt_topic, 100);
+
         }
     }
     cout << endl;
