@@ -100,10 +100,10 @@ void ground_truth_cb(const geometry_msgs::TransformStamped::ConstPtr& msg, int i
 
     int node_id = nodes_id[i];
 
-    Quaterniond q_W_B = q_W_V*Quaterniond(R_V_B[node_id]);
-    Vector3d t_W_B    = q_W_V.toRotationMatrix()*t_V_B[node_id];
+    Quaterniond q_W_B     = q_W_V*Quaterniond(R_V_B[node_id]);
+    Vector3d    t_V_B_inW = q_W_V.toRotationMatrix()*t_V_B[node_id];
 
-    Vector3d p_W_B = p_W_V + t_W_B;
+    Vector3d p_W_B = p_W_V + t_V_B_inW;
 
     ground_truth_viz_msg[i].pose.position.x = p_W_B.x();
     ground_truth_viz_msg[i].pose.position.y = p_W_B.y();
@@ -429,21 +429,22 @@ int main(int argc, char **argv)
         R_V_B.insert(make_pair(nodes_id[i], Matrix3d::Identity()));
         t_V_B.insert(make_pair(nodes_id[i], Matrix<double, 3, 1>(0, 0, 0)));
     }
-    std::vector<double> T_V_B;
-    if(rnsim_nh.getParam("T_V_B", T_V_B))
+    std::vector<double> T_B_V;
+    if(rnsim_nh.getParam("T_B_V", T_B_V))
     {
         const int TF_LEN = 17;
-        int tfs = T_V_B.size()/TF_LEN;
+        int tfs = T_B_V.size()/TF_LEN;
         printf("Received transforms for %d node(s).\n", tfs); // 4x4 matrix plus one ID;
         for(int i = 0; i < tfs; i++)
         {
-            int node_id = T_V_B[i*TF_LEN];
+            int node_id = T_B_V[i*TF_LEN];
 
-            Matrix<double, 4, 4> tf = Matrix<double, 4, 4, RowMajor>(&T_V_B[i*TF_LEN + 1]);
+            Matrix<double, 4, 4> tf = Matrix<double, 4, 4, RowMajor>(&T_B_V[i*TF_LEN + 1]);
 
-            R_V_B[ node_id ] = tf.block<3, 3>(0, 0);
+            // Transform the T_B_V to T_V_B for conveniences in later calculations
+            R_V_B[ node_id ] = tf.block<3, 3>(0, 0).inverse();
 
-            t_V_B[ node_id ] = tf.block<3, 1>(0, 3);
+            t_V_B[ node_id ] = R_V_B[ node_id ]*(-tf.block<3, 1>(0, 3));
 
             printf("Node %d, T, R and t:\n", node_id);
             cout << tf << endl;

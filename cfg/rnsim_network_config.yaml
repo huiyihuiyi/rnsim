@@ -10,12 +10,18 @@ rnsim:
     # startup. If the node's coordinate is undetermined on startup, put 9999
     # into it.
     nodes_pos:
-        [5,   5, 2,
-        -5,   5, 0,
-        -5,  -5, 2,
-         5,  -5, 0,
+        [3,   3, 0,
+        -3,   3, 0,
+        -3,  -3, 0,
+         3,  -3, 0,
          9999, 9999, 9999
         ]
+        # [10.5,   0.5, 0,
+        #   9.5,   0.5, 0,
+        #   9.5,  -0.5, 0,
+        #  10.5,  -0.5, 0,
+        #  9999, 9999, 9999
+        # ]
     # 3D coordinates of the anchors in each node's body frame. Each row starts
     # with the node's ID, then the number of antennas, then the triplets of
     # anchor coordinates. Nodes that don't have anything declared for them are
@@ -28,12 +34,12 @@ rnsim:
                   # 0.0  , -0.25 , 0.0 ,
          201, 2,  0.0 ,  0.0 ,  0.0 ,
                   0.0 ,  0.25,  0.0 ]
-    # Transform from the ground truth body frame to the actual body frame
-    T_V_B:
+    # Transform from the vicon frame to the body frame
+    T_B_V:
         [200,
-             1.0,  0.0,  0.0,  0.0929,
-             0.0,  1.0,  0.0, -0.0286,
-             0.0,  0.0,  1.0, -0.1070,
+             1.0,  0.0,  0.0, -0.0929074494,
+             0.0,  1.0,  0.0,  0.0285561173,
+             0.0,  0.0,  1.0,  0.1070146265,
              0.0,  0.0,  0.0,  1.0]
     # Slot map, each row starts with the slot ID, followed by requestor ID,
     # responder ID, requester antenna ID, responder antenna ID, and time period.
@@ -53,17 +59,30 @@ rnsim:
     #      7,  200, 103, 1, 0, 0.05]
 
     slotmap:
-        [0,  200, 100, 0, 0, 0.1,
-         1,  200, 102, 1, 0, 0.1,
+        [0,  200, 100, 0, 0, 0.016,
+         1,  200, 102, 1, 0, 0.016,
          
-         2,  200, 101, 0, 0, 0.1,
-         3,  200, 103, 1, 0, 0.1,
+         2,  200, 101, 0, 0, 0.016,
+         3,  200, 103, 1, 0, 0.016,
          
-         4,  200, 102, 0, 0, 0.1,
-         5,  200, 100, 1, 0, 0.1,
+         4,  200, 102, 0, 0, 0.016,
+         5,  200, 100, 1, 0, 0.016,
          
-         6,  200, 103, 0, 0, 0.1,
-         7,  200, 101, 1, 0, 0.1]
+         6,  200, 103, 0, 0, 0.016,
+         7,  200, 101, 1, 0, 0.016]
+
+    # slotmap:
+    #     [0,  200, 100, 0, 0, 0.025,
+    #      1,  200, 102, 1, 0, 0.025,
+         
+    #      2,  200, 101, 0, 0, 0.025,
+    #      3,  200, 103, 1, 0, 0.025,
+         
+    #      4,  200, 102, 0, 0, 0.025,
+    #      5,  200, 100, 1, 0, 0.025,
+         
+    #      6,  200, 103, 0, 0, 0.025,
+    #      7,  200, 101, 1, 0, 0.025]
 
     # slotmap:
     #     [0,  200, 100, 0, 0, 0.05,
@@ -99,5 +118,5 @@ rnsim:
     # Ranging noise mean and std
     range_noise_gaussian: [0.00, 0.05]
     # Ranging loss rate
-    loss_chance: 0.05
+    loss_chance: 0.00
 
