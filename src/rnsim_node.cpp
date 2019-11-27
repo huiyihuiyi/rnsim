@@ -125,13 +125,36 @@ void ground_truth_cb(const geometry_msgs::TransformStamped::ConstPtr& msg, int i
 
 void timer_cb(const ros::TimerEvent&)
 {
+    // Skip a few calls to avoid a quirk
+    static int skips = 0;
+    if(skips < 5)
+    {
+        skips++;
+        return;
+    }
+
     static int slot_idx = 0;
+    static bool first_call = true;
     static ros::Time prev_time = ros::Time::now();
 
-    printf("Slot: %d. True time: %.3f. Intended time: %.3f\n",
-            slot_idx, (ros::Time::now() - prev_time).toSec(),
-            slotmap_time[slot_idx]);
-    prev_time = ros::Time::now();
+    if(first_call)
+    {
+        first_call = false;
+        prev_time = prev_time - ros::Duration(slotmap_time[slot_idx]);
+    }
+
+    double true_time  = (ros::Time::now() - prev_time).toSec();
+    double delay_time =  true_time - slotmap_time[slot_idx];
+
+    printf("Slot: %d. Prev time: %f. Curr Time: %f. True time: %.3f. Intended time: %.3f. Delay: %f\n",
+            slot_idx,
+            prev_time.toSec(),
+            ros::Time::now().toSec(),
+            true_time,
+            slotmap_time[slot_idx],
+            delay_time);
+
+    ros::Time proc_start = ros::Time::now();
     
     int transactions = slotmap[slot_idx].size()/4;
     if (transactions != 0)
@@ -276,12 +299,30 @@ void timer_cb(const ros::TimerEvent&)
     }
     cout << endl;
 
+    double prev_slot_time = slotmap_time[slot_idx];
+
     // Increment the slot ID
     slot_idx++;
     if (slot_idx == slotmap_time.size())
         slot_idx = 0;
 
-    rn_timer.setPeriod(ros::Duration(slotmap_time[slot_idx]));
+    double curr_slot_time = slotmap_time[slot_idx];
+
+    if (curr_slot_time != prev_slot_time)
+    {
+        rn_timer.setPeriod(ros::Duration(slotmap_time[slot_idx] - delay_time));
+
+        printf("This slot proc time: %f\n", (ros::Time::now() - proc_start).toSec());
+
+        if(delay_time > slotmap_time[slot_idx] || delay_time < 0)
+            delay_time = 0;
+
+        prev_time = ros::Time::now() - ros::Duration(delay_time);
+    }
+    else
+    {
+        prev_time = ros::Time::now();
+    }
 
     return;
 }
