@@ -262,12 +262,12 @@ void timer_cb(const ros::TimerEvent&)
                         uwb_range_info_msg[rqst_idx].antenna = ant_rqst_idx << 4 | ant_rspd_idx;
                         uwb_range_info_msg[rqst_idx].stopwatch_time = 123;
                         uwb_range_info_msg[rqst_idx].uwb_time = (uint32_t)(ros::Time::now().toSec()*1000);
-                        uwb_range_info_msg[rqst_idx].responder_location.x = rspd_pos(0);
-                        uwb_range_info_msg[rqst_idx].responder_location.y = rspd_pos(1);
-                        uwb_range_info_msg[rqst_idx].responder_location.z = rspd_pos(2);
-                        uwb_range_info_msg[rqst_idx].antenna_offset.x = rqst_ant_pos(0);
-                        uwb_range_info_msg[rqst_idx].antenna_offset.y = rqst_ant_pos(1);
-                        uwb_range_info_msg[rqst_idx].antenna_offset.z = rqst_ant_pos(2);
+                        uwb_range_info_msg[rqst_idx].responder_location.x  = rspd_pos(0);
+                        uwb_range_info_msg[rqst_idx].responder_location.y  = rspd_pos(1);
+                        uwb_range_info_msg[rqst_idx].responder_location.z  = rspd_pos(2);
+                        uwb_range_info_msg[rqst_idx].rqst_antenna_offset.x = rqst_ant_pos(0);
+                        uwb_range_info_msg[rqst_idx].rqst_antenna_offset.y = rqst_ant_pos(1);
+                        uwb_range_info_msg[rqst_idx].rqst_antenna_offset.z = rqst_ant_pos(2);
 
                         range_pub[rqst_idx].publish(uwb_range_info_msg[rqst_idx]);
 

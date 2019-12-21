@@ -1,0 +1,126 @@
+rnsim:
+    # ID numbers of the UWB nodes, we are using a convention where the list is
+    # supposed to be plit into two rows, first row lists the supposedly static
+    # nodes (anchors), and second row is for moving nodes
+    nodes_id:
+        [100, 101, 102, 103,
+         200]
+    # 3D position of the nodes in the supposed World coordinates systems, each
+    # row should have three coordinates (x, y, z) of the corresponding node on
+    # startup. If the node's coordinate is undetermined on startup, put 9999
+    # into it.
+    nodes_pos:
+        [ 3,    3,   1.5,
+          3,   -3,   1.5,
+          0,   -3,   1.5,
+         -3,    3,   1.5,
+         9999, 9999, 9999
+        ]
+        # [10.5,   0.5, 0,
+        #   9.5,   0.5, 0,
+        #   9.5,  -0.5, 0,
+        #  10.5,  -0.5, 0,
+        #  9999, 9999, 9999
+        # ]
+    # 3D coordinates of the anchors in each node's body frame. Each row starts
+    # with the node's ID, then the number of antennas, then the triplets of
+    # anchor coordinates. Nodes that don't have anything declared for them are
+    # assumed to have a single antenna at its origin
+    antennas_pos:
+        [200, 2,
+                  0.25 ,  0.0 ,  0.0 ,
+                 -0.25 ,  0.0 ,  0.0 ,
+                  # 0.0  ,  0.25 , 0.0 ,
+                  # 0.0  , -0.25 , 0.0 ,
+         201, 2,  0.0 ,  0.0 ,   0.0 ,
+                  0.0 ,  0.0 ,   0.0 ]
+    # Transform from the vicon frame to the body frame
+    T_B_V:
+        [200,
+             1.0,  0.0,  0.0, -0.0929074494,
+             0.0,  1.0,  0.0,  0.0285561173,
+             0.0,  0.0,  1.0,  0.1070146265,
+             0.0,  0.0,  0.0,  1.0]
+    # Slot map, each row starts with the slot ID, followed by requestor ID,
+    # responder ID, requester antenna ID, responder antenna ID, and time period.
+    # If two transactions occur at the same time, the time period of the firstly
+    # declared transaction is the time period of the slot.
+    # slotmap:
+    #     [0,  200, 100, 0, 0, 0.05,
+    #      1,  200, 100, 1, 0, 0.05,
+         
+    #      2,  200, 101, 0, 0, 0.05,
+    #      3,  200, 101, 1, 0, 0.05,
+         
+    #      4,  200, 102, 0, 0, 0.05,
+    #      5,  200, 102, 1, 0, 0.05,
+         
+    #      6,  200, 103, 0, 0, 0.05,
+    #      7,  200, 103, 1, 0, 0.05]
+
+    # slotmap:
+    #     [0,  200, 100, 0, 0, 0.016,
+    #      1,  200, 102, 1, 0, 0.016,
+         
+    #      2,  200, 101, 0, 0, 0.016,
+    #      3,  200, 103, 1, 0, 0.016,
+         
+    #      4,  200, 102, 0, 0, 0.016,
+    #      5,  200, 100, 1, 0, 0.016,
+         
+    #      6,  200, 103, 0, 0, 0.016,
+    #      7,  200, 101, 1, 0, 0.016]
+
+    slotmap:
+        [0,  200, 100, 0, 0, 0.025,
+         1,  200, 101, 1, 0, 0.025,
+         
+         2,  200, 101, 0, 0, 0.025,
+         3,  200, 102, 1, 0, 0.025,
+         
+         4,  200, 102, 0, 0, 0.025,
+         5,  200, 100, 1, 0, 0.025]
+
+    # slotmap:
+    #     [0,  200, 100, 0, 0, 0.025,
+    #      1,  200, 101, 1, 0, 0.025,
+         
+    #      2,  200, 101, 0, 0, 0.025,
+    #      3,  200, 100, 1, 0, 0.025]
+
+    # slotmap:
+    #     [0,  200, 100, 0, 0, 0.05,
+    #      1,  200, 101, 0, 0, 0.05,
+    #      2,  200, 102, 0, 0, 0.05,
+    #      3,  200, 103, 0, 0, 0.05]
+
+    # slotmap:
+    #     [0,  200, 100, 0, 0, 0.025,
+    #      1,  200, 101, 1, 0, 0.025,
+    #      2,  200, 102, 2, 0, 0.025,
+    #      3,  200, 103, 3, 0, 0.025,
+
+    #      4,  200, 101, 0, 0, 0.025,
+    #      5,  200, 102, 1, 0, 0.025,
+    #      6,  200, 103, 2, 0, 0.025,
+    #      7,  200, 100, 3, 0, 0.025,
+
+    #      8,  200, 102, 0, 0, 0.025,
+    #      9,  200, 103, 1, 0, 0.025,
+    #      10, 200, 100, 2, 0, 0.025,
+    #      11, 200, 101, 3, 0, 0.025,
+
+    #      12, 200, 103, 0, 0, 0.025,
+    #      13, 200, 100, 1, 0, 0.025,
+    #      14, 200, 101, 2, 0, 0.025,
+    #      15, 200, 102, 3, 0, 0.025]
+
+    # Name of topics for ground truth, each row specify the ID of the node
+    # follow
+    ground_truth_topic:
+        ["200", "/vicon/firefly_sbx/firefly_sbx"]
+    # Ranging noise mean and std
+    range_noise_gaussian: [0.00, 0.05]
+    # Ranging loss rate
+    loss_chance: 0.00
+
