@@ -10,10 +10,10 @@ rnsim:
     # startup. If the node's coordinate is undetermined on startup, put 9999
     # into it.
     nodes_pos:
-        [ 3,    3,   1.5,
-          3,   -3,   1.5,
-          0,   -3,   1.5,
-         -3,    3,   1.5,
+        [ 3,    3,   4.5,
+          3,   -3,   4.5,
+          0,   -3,   4.5,
+         -3,    3,   4.5,
          9999, 9999, 9999
         ]
         # [10.5,   0.5, 0,
